@@ -327,12 +327,33 @@ export function parseRuleError(err) {
   } else if (RC === 'R001') {
     var AS = err.age !== undefined ? (err.age + '岁') : '';
     var RS = (err.minAge !== undefined && err.maxAge !== undefined) ? (err.minAge + '-' + err.maxAge + '岁') : '';
+    var minAge = err.minAge;
+    var maxAge = err.maxAge;
+    var curAge = err.age;
+    var ageReason = '';
+    var specificSuggestion = '';
+    if (curAge !== undefined && minAge !== undefined && maxAge !== undefined) {
+      if (curAge < minAge) {
+        var yearsToWait = minAge - curAge;
+        ageReason = `当前年龄 ${curAge}岁 低于课程最低要求 ${minAge}岁，还差 ${yearsToWait}年${yearsToWait === 1 ? '' : ''}才符合报名条件`;
+        specificSuggestion = `建议：可以先为 ${CN} 报名适合 ${curAge}岁 的启蒙课程，${yearsToWait}年后再考虑本课程。可关注同分类下适龄的「启蒙/入门」级别课程。`;
+      } else if (curAge > maxAge) {
+        var yearsOver = curAge - maxAge;
+        ageReason = `当前年龄 ${curAge}岁 已超过课程最高限制 ${maxAge}岁，超出 ${yearsOver}年${yearsOver === 1 ? '' : ''}`;
+        specificSuggestion = `建议：${CN} 已超龄，可考虑更高阶的「进阶/专业」同类课程，或咨询顾问是否有适合大龄儿童的同类课程。`;
+      } else {
+        ageReason = `当前年龄 ${curAge}岁 恰好落在 ${minAge}-${maxAge}岁范围之外`;
+        specificSuggestion = '请调整儿童或课程后重试，或联系顾问确认是否存在特殊政策。';
+      }
+    }
     shortMessage = '年龄不符：' + CN + (AS ? '（' + AS + '）' : '') + ' 不符合 ' + CoN + ' 的适龄范围';
-    detail.push('👶 儿童：' + CN);
+    detail.push('👶 儿童：' + CN + (err.childId ? ' (ID：' + err.childId + ')' : ''));
     if (AS) detail.push('🎂 当前年龄：' + AS);
     if (RS) detail.push('📊 课程适龄：' + RS);
     detail.push('🆕 目标课程：' + CoN);
+    if (ageReason) detail.push('🔍 原因：' + ageReason);
     detail.push('📜 规则编号：R001（年龄不符不能预约试听或报名）');
+    suggestion = specificSuggestion || '请调整儿童、班期或课程后重试';
   } else if (RC === 'R003') {
     shortMessage = '重复占位：' + CN + ' 已报名或预约过 ' + CoN;
     detail.push('👶 儿童：' + CN);

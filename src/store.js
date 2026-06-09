@@ -511,6 +511,24 @@ const FILTERS_INIT = {
 };
 
 // ============================================================
+// 看板分组配置
+// ============================================================
+
+export const KANBAN_GROUP_OPTIONS = [
+  { key: 'none', label: '不分栏（网格）', icon: '⊞' },
+  { key: 'category', label: '按分类分栏', icon: '📂' },
+  { key: 'ageStatus', label: '按适龄状态分栏', icon: '🎂' },
+  { key: 'seatStatus', label: '按名额状态分栏', icon: '👥' },
+  { key: 'level', label: '按难度等级分栏', icon: '📈' }
+];
+
+export const KANBAN_GROUP_INIT = {
+  enabled: false,
+  groupBy: 'category',
+  collapsedGroups: {}
+};
+
+// ============================================================
 // 本地审计日志
 // ============================================================
 
@@ -582,6 +600,7 @@ export function getInitialState() {
     notifications: NOTIFICATIONS_INIT,
     favorites: { ...FAVORITES_INIT },
     filters: { ...FILTERS_INIT },
+    kanbanGroup: { ...KANBAN_GROUP_INIT },
     auditLog: AUDIT_LOG_INIT,
     anomalies: ANOMALIES_INIT,
 

@@ -70,6 +70,20 @@ function appReducer(state, action) {
       return { ...state, selectedChildId: action.payload };
     case 'SET_FILTERS':
       return { ...state, filters: { ...state.filters, ...action.payload } };
+    case 'SET_KANBAN_GROUP':
+      return {
+        ...state,
+        kanbanGroup: { ...state.kanbanGroup, ...action.payload }
+      };
+    case 'TOGGLE_KANBAN_GROUP_COLLAPSE': {
+      const groupKey = action.payload;
+      const collapsed = { ...(state.kanbanGroup?.collapsedGroups || {}) };
+      collapsed[groupKey] = !collapsed[groupKey];
+      return {
+        ...state,
+        kanbanGroup: { ...state.kanbanGroup, collapsedGroups: collapsed }
+      };
+    }
     case 'TOGGLE_FAVORITE': {
       const { childId, courseId } = action.payload;
       const favs = { ...(state.favorites || {}) };
@@ -435,6 +449,14 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_FILTERS', payload: filters });
   }, []);
 
+  const setKanbanGroup = useCallback((config) => {
+    dispatch({ type: 'SET_KANBAN_GROUP', payload: config });
+  }, []);
+
+  const toggleKanbanGroupCollapse = useCallback((groupKey) => {
+    dispatch({ type: 'TOGGLE_KANBAN_GROUP_COLLAPSE', payload: groupKey });
+  }, []);
+
   const toggleFavorite = useCallback((childId, courseId) => {
     dispatch({ type: 'TOGGLE_FAVORITE', payload: { childId, courseId } });
   }, []);
@@ -598,6 +620,7 @@ export function AppProvider({ children }) {
     state,
     // 操作函数
     switchRole, selectChild, setFilters, toggleFavorite, markNotifRead,
+    setKanbanGroup, toggleKanbanGroupCollapse,
     bookTrial, enrollOrWaitlist, cancelEnrollment,
     adjustCapacity, resolveAnomaly, addConsultantNote, resetState,
     // 计算辅助
@@ -620,6 +643,7 @@ export function AppProvider({ children }) {
         .sort((a, b) => (a.position || 0) - (b.position || 0))
     }
   }), [state, switchRole, selectChild, setFilters, toggleFavorite, markNotifRead,
+       setKanbanGroup, toggleKanbanGroupCollapse,
        bookTrial, enrollOrWaitlist, cancelEnrollment,
        adjustCapacity, resolveAnomaly, addConsultantNote, resetState]);
 

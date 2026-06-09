@@ -64,7 +64,7 @@ export default function AdminView() {
           <div className="card">
             <div className="card-head"><h3>📦 班期容量调整控制台</h3></div>
             <div className="rule-warn block">
-              <b>R007：</b>容量调低时，如果<b>已报名人数 > 新容量</b>，不会直接删除任何报名，而是进入「异常待处理」列表，由教务人工选择溢出的报名取消。
+              <b>R007：</b>容量调低时，如果<b>已报名人数 {'>'} 新容量</b>，不会直接删除任何报名，而是进入「异常待处理」列表，由教务人工选择溢出的报名取消。
             </div>
             <label>目标课程
               <select value={capTarget.courseId} onChange={e => {
@@ -99,8 +99,8 @@ export default function AdminView() {
                   </label>
                   <div className={`overflow-predict ${willOverflow ? 'bad' : 'ok'}`}>
                     {willOverflow
-                      ? <>⚠️ 预测：新容量 {capTarget.newCapacity} < 已报名 {enr}，溢出 {enr - Number(capTarget.newCapacity)} 人 → 将进入<b>异常待处理</b></>
-                      : <>✓ 预测：新容量 {capTarget.newCapacity} ≥ 已报名 {enr}，将直接生效</>}
+                      ? <React.Fragment>⚠️ 预测：新容量 {capTarget.newCapacity} {'<'} 已报名 {enr}，溢出 {enr - Number(capTarget.newCapacity)} 人 → 将进入<b>异常待处理</b></React.Fragment>
+                      : <React.Fragment>✓ 预测：新容量 {capTarget.newCapacity} ≥ 已报名 {enr}，将直接生效</React.Fragment>}
                   </div>
                   <div className="card-actions">
                     <button className="btn btn-primary" onClick={runAdjust}>⚙️ 执行容量调整</button>

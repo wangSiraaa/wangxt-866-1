@@ -12,6 +12,14 @@ export default function CourseCard({ course }) {
 
   const age = child ? calculateAge(child.birthDate) : null;
   const ageOk = (child && course) ? isAgeEligible(age, course) : null;
+  let ageReasonText = null;
+  if (child && course && ageOk === false) {
+    if (age < course.minAge) {
+      ageReasonText = `年龄偏小（${age}岁 < 最低${course.minAge}岁，还差${course.minAge - age}年）`;
+    } else if (age > course.maxAge) {
+      ageReasonText = `年龄偏大（${age}岁 > 最高${course.maxAge}岁，超出${age - course.maxAge}年）`;
+    }
+  }
   const enrolled = countEnrollmentsByCourse(state.enrollments, course.id, 'active');
   const remaining = Math.max(0, course.totalSeats - enrolled);
   const waitCount = countWaitlistByCourse(state.waitlist, course.id, 'waiting');
@@ -52,8 +60,8 @@ export default function CourseCard({ course }) {
           title={isFav ? '取消收藏' : '收藏课程'}
         >{isFav ? '⭐' : '☆'}</button>
         <div className="course-cat-badge">{course.category}</div>
-        {ageOk === false && <div className="age-badge-bad">🚫年龄不符</div>}
-        {ageOk === true && <div className="age-badge-ok">✓适龄</div>}
+        {ageOk === false && <div className="age-badge-bad" title={ageReasonText || '年龄不符合该课程的适龄范围'}>🚫{ageReasonText || '年龄不符'}</div>}
+        {ageOk === true && <div className="age-badge-ok">✓适龄（{age}岁）</div>}
       </div>
 
       <div className="course-body">
@@ -114,12 +122,15 @@ export default function CourseCard({ course }) {
                       <button
                         className="btn btn-secondary btn-xs"
                         onClick={() => doTrial(s.id)}
-                        title="先试听再决定"
+                        title={ageOk === false ? (ageReasonText || '该儿童年龄不符合此课程的适龄范围，无法预约试听') : '先试听再决定'}
+                        disabled={ageOk === false}
+                        style={ageOk === false ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
                       >试听</button>
                       <button
                         className="btn btn-primary btn-xs"
                         onClick={() => doEnroll(s.id)}
-                        disabled={alreadyEnrolled}
+                        disabled={alreadyEnrolled || ageOk === false}
+                        title={ageOk === false ? (ageReasonText || '该儿童年龄不符合此课程的适龄范围，无法报名') : (alreadyEnrolled ? '已报名' : remaining === 0 ? '将加入候补队列' : '立即报名')}
                       >
                         {remaining === 0 ? '候补' : '报名'}
                       </button>
@@ -130,8 +141,19 @@ export default function CourseCard({ course }) {
             )}
             {(sessions.length === 0) && (
               <div className="row-tight">
-                <button className="btn btn-secondary" onClick={() => doTrial(null)}>预约试听</button>
-                <button className="btn btn-primary" onClick={() => doEnroll(null)} disabled={alreadyEnrolled}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => doTrial(null)}
+                  title={ageOk === false ? (ageReasonText || '该儿童年龄不符合此课程的适龄范围，无法预约试听') : '预约试听'}
+                  disabled={ageOk === false}
+                  style={ageOk === false ? { opacity: 0.6, cursor: 'not-allowed' } : {}}
+                >预约试听</button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => doEnroll(null)}
+                  disabled={alreadyEnrolled || ageOk === false}
+                  title={ageOk === false ? (ageReasonText || '该儿童年龄不符合此课程的适龄范围，无法报名') : (alreadyEnrolled ? '已报名' : remaining === 0 ? '将加入候补队列' : '直接报名')}
+                >
                   {remaining === 0 ? '加入候补' : '直接报名'}
                 </button>
               </div>

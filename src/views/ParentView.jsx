@@ -1,13 +1,92 @@
 import React from 'react';
 import { useApp } from '../context.jsx';
-import { countEnrollmentsByCourse, countWaitlistByCourse } from '../store.js';
-import CourseCard from './CourseCard.jsx';
+import { countEnrollmentsByCourse, countWaitlistByCourse, isAgeEligible, calculateAge } from '../store.js';
+import { KANBAN_GROUP_OPTIONS } from '../store.js';
+import CourseCard from '../components/CourseCard.jsx';
 
 const CATEGORIES = [null, '美术', '音乐', '体育', '舞蹈', '语言', '科技', '思维'];
 
+const LEVEL_ORDER = ['启蒙', '入门', '基础', '进阶', '高级', '专业'];
+
+function groupCourses(courses, groupBy, child, state) {
+  if (groupBy === 'none') return { '全部': courses };
+  const groups = {};
+  for (const c of courses) {
+    let key;
+    let label;
+    if (groupBy === 'category') {
+      key = c.category || '其他';
+      label = key;
+    } else if (groupBy === 'level') {
+      key = c.level || '未分级';
+      label = key;
+    } else if (groupBy === 'ageStatus') {
+      if (!child) {
+        key = '未选儿童';
+        label = '请先选择儿童';
+      } else {
+        const age = calculateAge(child.birthDate);
+        const eligible = isAgeEligible(age, c);
+        if (eligible) {
+          key = 'eligible';
+          label = `✓ 适龄（${age}岁符合${c.minAge}-${c.maxAge}岁）`;
+        } else if (age < c.minAge) {
+          key = 'tooYoung';
+          label = `🌱 年龄偏小（${age}岁 < ${c.minAge}岁）`;
+        } else {
+          key = 'tooOld';
+          label = `🍂 年龄偏大（${age}岁 > ${c.maxAge}岁）`;
+        }
+      }
+    } else if (groupBy === 'seatStatus') {
+      const enrolled = countEnrollmentsByCourse(state.enrollments, c.id, 'active');
+      const remaining = Math.max(0, c.totalSeats - enrolled);
+      if (remaining === 0) {
+        key = 'full';
+        label = `🔴 已满员（${enrolled}/${c.totalSeats}）`;
+      } else if (remaining <= 3) {
+        key = 'tight';
+        label = `🟡 名额紧张（剩${remaining}个/${c.totalSeats}）`;
+      } else {
+        key = 'ok';
+        label = `🟢 名额充足（剩${remaining}个/${c.totalSeats}）`;
+      }
+    } else {
+      key = '其他';
+      label = key;
+    }
+    if (!groups[key]) groups[key] = { key, label, courses: [] };
+    groups[key].courses.push(c);
+  }
+  return groups;
+}
+
+function getGroupOrder(groups, groupBy) {
+  const keys = Object.keys(groups);
+  if (groupBy === 'level') {
+    return keys.sort((a, b) => {
+      const ia = LEVEL_ORDER.indexOf(groups[a].key);
+      const ib = LEVEL_ORDER.indexOf(groups[b].key);
+      if (ia === -1 && ib === -1) return groups[a].key.localeCompare(groups[b].key);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+  }
+  if (groupBy === 'ageStatus') {
+    const ageOrder = ['eligible', 'tooYoung', 'tooOld', '未选儿童'];
+    return keys.sort((a, b) => ageOrder.indexOf(a) - ageOrder.indexOf(b));
+  }
+  if (groupBy === 'seatStatus') {
+    const seatOrder = ['ok', 'tight', 'full'];
+    return keys.sort((a, b) => seatOrder.indexOf(a) - seatOrder.indexOf(b));
+  }
+  return keys.sort((a, b) => groups[a].label.localeCompare(groups[b].label, 'zh-Hans-CN'));
+}
+
 export default function ParentView() {
-  const { state, setFilters, helpers } = useApp();
-  const { filters } = state;
+  const { state, setFilters, setKanbanGroup, toggleKanbanGroupCollapse, helpers } = useApp();
+  const { filters, kanbanGroup } = state;
   const child = helpers.getChild(state.selectedChildId);
 
   let courses = [...state.courses];
@@ -56,6 +135,11 @@ export default function ParentView() {
   }
   courses = sortCourses(courses);
 
+  const isKanbanEnabled = kanbanGroup?.enabled && kanbanGroup?.groupBy && kanbanGroup.groupBy !== 'none';
+  const groups = isKanbanEnabled ? groupCourses(courses, kanbanGroup.groupBy, child, state) : null;
+  const groupKeys = groups ? getGroupOrder(groups, kanbanGroup.groupBy) : [];
+  const collapsedGroups = kanbanGroup?.collapsedGroups || {};
+
   return (
     <div className="view-parent">
       <div className="filter-bar card">
@@ -71,6 +155,27 @@ export default function ParentView() {
             <input type="checkbox" checked={filters.hasSeatsOnly} onChange={e => setFilters({ hasSeatsOnly: e.target.checked })}/>
             仅看有名额
           </label>
+          <div className="kanban-toggle-wrap" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label className="check-wrap" title="开启看板分组模式">
+              <input
+                type="checkbox"
+                checked={kanbanGroup?.enabled || false}
+                onChange={e => setKanbanGroup({ enabled: e.target.checked })}
+              />
+              📋 看板分组
+            </label>
+            {kanbanGroup?.enabled && (
+              <select
+                value={kanbanGroup?.groupBy || 'category'}
+                onChange={e => setKanbanGroup({ groupBy: e.target.value })}
+                style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd' }}
+              >
+                {KANBAN_GROUP_OPTIONS.map(opt => (
+                  <option key={opt.key} value={opt.key}>{opt.icon} {opt.label}</option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
         <div className="filter-row">
           <span className="filter-label">分类</span>
@@ -112,13 +217,59 @@ export default function ParentView() {
         <div className="filter-summary">
           共 <b>{courses.length}</b> 门课程
           {child && <> · 当前儿童：<b>{child.name}</b>（{helpers.calculateAge(child.birthDate)}岁）</>}
+          {isKanbanEnabled && <> · 看板模式：<b>{KANBAN_GROUP_OPTIONS.find(o => o.key === kanbanGroup.groupBy)?.label || ''}</b> · <b>{groupKeys.length}</b> 个分栏</>}
         </div>
       </div>
 
-      <div className="course-grid">
-        {courses.length === 0 && <div className="empty-hint large">😕 没有符合条件的课程，试试调整筛选条件</div>}
-        {courses.map(c => <CourseCard key={c.id} course={c}/>)}
-      </div>
+      {!isKanbanEnabled ? (
+        <div className="course-grid">
+          {courses.length === 0 && <div className="empty-hint large">😕 没有符合条件的课程，试试调整筛选条件</div>}
+          {courses.map(c => <CourseCard key={c.id} course={c}/>)}
+        </div>
+      ) : (
+        <div className="kanban-board">
+          {groupKeys.length === 0 && <div className="empty-hint large">😕 没有符合条件的课程，试试调整筛选条件</div>}
+          {groupKeys.map(gk => {
+            const g = groups[gk];
+            const isCollapsed = collapsedGroups[gk] || false;
+            const borderColor = {
+              eligible: '#52c41a', tooYoung: '#1890ff', tooOld: '#8c8c8c', '未选儿童': '#bfbfbf',
+              ok: '#52c41a', tight: '#faad14', full: '#ff4d4f',
+              美术: '#f5222d', 音乐: '#722ed1', 体育: '#13c2c2', 舞蹈: '#eb2f96',
+              语言: '#1890ff', 科技: '#2f54eb', 思维: '#fa8c16'
+            }[gk] || '#d9d9d9';
+            return (
+              <div
+                key={gk}
+                className="kanban-column"
+                style={{ borderTopColor: borderColor }}
+              >
+                <div
+                  className="kanban-column-header"
+                  onClick={() => toggleKanbanGroupCollapse(gk)}
+                  title="点击展开/收起"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="kanban-col-title">
+                    <span className="kanban-collapse-arrow">{isCollapsed ? '▶' : '▼'}</span>
+                    <span className="kanban-col-label">{g.label}</span>
+                    <span className="kanban-col-count">{g.courses.length}门</span>
+                  </div>
+                </div>
+                {!isCollapsed && (
+                  <div className="kanban-column-body">
+                    {g.courses.length === 0 ? (
+                      <div className="empty-hint small">无课程</div>
+                    ) : (
+                      g.courses.map(c => <CourseCard key={c.id} course={c}/>)
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
