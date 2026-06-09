@@ -707,6 +707,64 @@ clearPersistedState();
 p('TC-S6o 清理持久化测试数据完成');
 
 // ============================================================
+// S7. R002 同儿童同时间段冲突核心回归 (小明美术->乐高机器人)
+// ============================================================
+section('S7. R002 时间冲突核心回归');
+
+const st7 = getInitialState();
+
+const xm7 = st7.children.find(function(c){return c.id=="ch_xm";});
+assert(xm7 && xm7.name=="小明", "TC-S7a 儿童小明存在");
+const art7 = st7.courses.find(function(c){return c.id=="c_art_01";});
+const rob7 = st7.courses.find(function(c){return c.id=="c_robot_01";});
+assert(!!art7, "TC-S7b 美术班存在");
+assert(!!rob7, "TC-S7c 机器人班存在");
+const sA7 = st7.sessions.find(function(s){return s.id=="s_art_01_sat";});
+const sR7 = st7.sessions.find(function(s){return s.id=="s_robot_01_sat";});
+assert(!!sA7, "TC-S7d 美术周六班期存在");
+assert(!!sR7, "TC-S7e 机器人周六班期存在");
+assert(sA7.dayOfWeek==sR7.dayOfWeek && sA7.startTime==sR7.startTime, "TC-S7f 两班期同星期同时段");
+
+const xmEnr7 = st7.enrollments.find(function(e){return e.childId=="ch_xm" && e.courseId=="c_art_01" && e.sessionId=="s_art_01_sat";});
+assert(!!xmEnr7, "TC-S7g 小明已报名美术周六班");
+
+let r002Err7 = null;
+try { enforceRules(st7, {opType:"enroll", childId:"ch_xm", courseId:"c_robot_01", sessionId:"s_robot_01_sat", role:"parent"}); }
+catch(x7) { r002Err7 = x7; }
+assert(!!r002Err7 && r002Err7.ruleCode=="R002", "★TC-S7h 小明报名乐高机器人周六班被R002拒绝: "+(r002Err7?r002Err7.ruleCode:"无"));
+
+const pe7 = parseRuleError ? parseRuleError(r002Err7) : null;
+assert(!!pe7, "TC-S7i parseRuleError返回对象");
+
+if (pe7) {
+  const d7 = pe7.detail || [];
+  const dj7 = d7.join("  ");
+  assert(pe7.ruleCode=="R002", "TC-S7j ruleCode=R002");
+  assert(typeof pe7.shortMessage=="string" && pe7.shortMessage.length>0, "TC-S7k shortMessage存在");
+  assert(pe7.child && pe7.child.id=="ch_xm" && pe7.child.name=="小明", "TC-S7l 顶层child是小明");
+  assert(d7.some(function(x){return x.indexOf("儿童")>=0 && x.indexOf("小明")>=0;}), "TC-S7m detail含儿童+小明: "+dj7);
+  assert(d7.some(function(x){return (x.indexOf("原课程")>=0 || x.indexOf("已占位")>=0) && x.indexOf("美术")>=0;}), "TC-S7n detail含原课程美术: "+dj7);
+  assert(d7.some(function(x){return (x.indexOf("新课程")>=0 || x.indexOf("尝试报名")>=0) && (x.indexOf("机器人")>=0 || x.indexOf("乐高")>=0);}), "TC-S7o detail含新课程机器人: "+dj7);
+  assert(d7.some(function(x){return x.indexOf("班期")>=0;}), "TC-S7p detail含班期: "+dj7);
+  assert(d7.some(function(x){return x.indexOf("冲突时间")>=0 || (x.indexOf("周六")>=0 && x.indexOf("09:00")>=0);}), "TC-S7q detail含冲突时间周六09:00: "+dj7);
+  assert(d7.some(function(x){return x.indexOf("R002")>=0;}), "TC-S7r detail含R002编号: "+dj7);
+  assert((pe7.conflictCourseName||"").indexOf("美术")>=0, "TC-S7s conflictCourseName含美术: "+pe7.conflictCourseName);
+  assert((pe7.conflictTime||"").indexOf("周六")>=0 && (pe7.conflictTime||"").indexOf("09:00")>=0, "TC-S7t conflictTime含周六09:00: "+pe7.conflictTime);
+  assert(typeof pe7.suggestion=="string" && pe7.suggestion.length>0, "TC-S7u suggestion存在");
+  console.log("");
+  console.log("  R002完整错误展示:");
+  console.log("    [摘要] " + pe7.shortMessage);
+  d7.forEach(function(ln){console.log("    [明细] " + ln);});
+  console.log("    [建议] " + pe7.suggestion);
+  console.log("");
+}
+
+let r002Trial7 = null;
+try { enforceRules(st7, {opType:"book_trial", childId:"ch_xm", courseId:"c_robot_01", sessionId:"s_robot_01_sat", role:"parent"}); }
+catch(x7) { r002Trial7 = x7; }
+assert(!!r002Trial7 && r002Trial7.ruleCode=="R002", "TC-S7v 小明试听乐高机器人周六班也被R002拒绝: "+(r002Trial7?r002Trial7.ruleCode:"无"));
+
+// ============================================================
 // 汇总
 // ============================================================
 console.log('');

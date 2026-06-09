@@ -305,28 +305,66 @@ export function enforceRules(state, params) {
 // ============================================================
 export function parseRuleError(err) {
   if (!err || !err.ruleCode) return null;
+  var RC = err.ruleCode;
+  var CN = err.childName || '未知儿童';
+  var CoN = err.courseName || '未知课程';
+  var SID = err.sessionId || '';
+  var CCN = err.conflictCourse || err.conflictCourseName || '';
+  var CT = err.conflictTime || '';
+  var shortMessage = err.message || (RC + ' 规则校验失败');
+  var detail = [];
+  var suggestion = '请调整儿童、班期或课程后重试';
+
+  if (RC === 'R002') {
+    shortMessage = '时间冲突：' + CN + ' 在该时段已报名【' + (CCN || '另一门课程') + '】';
+    detail.push('👶 儿童：' + CN + (err.childId ? ' (ID：' + err.childId + ')' : ''));
+    detail.push('📋 原课程（已占位）：' + (CCN || '未知'));
+    detail.push('🆕 新课程（尝试报名）：' + CoN);
+    if (SID) detail.push('📅 班期：' + SID);
+    if (CT) detail.push('⏰ 冲突时间：' + CT);
+    detail.push('📜 规则编号：R002（同一儿童同一时间段只能试听或报名一门课）');
+    suggestion = '建议：为 ' + CN + ' 选择其他时段的 ' + CoN + ' 班期，或改报其他不冲突的课程';
+  } else if (RC === 'R001') {
+    var AS = err.age !== undefined ? (err.age + '岁') : '';
+    var RS = (err.minAge !== undefined && err.maxAge !== undefined) ? (err.minAge + '-' + err.maxAge + '岁') : '';
+    shortMessage = '年龄不符：' + CN + (AS ? '（' + AS + '）' : '') + ' 不符合 ' + CoN + ' 的适龄范围';
+    detail.push('👶 儿童：' + CN);
+    if (AS) detail.push('🎂 当前年龄：' + AS);
+    if (RS) detail.push('📊 课程适龄：' + RS);
+    detail.push('🆕 目标课程：' + CoN);
+    detail.push('📜 规则编号：R001（年龄不符不能预约试听或报名）');
+  } else if (RC === 'R003') {
+    shortMessage = '重复占位：' + CN + ' 已报名或预约过 ' + CoN;
+    detail.push('👶 儿童：' + CN);
+    detail.push('🆕 目标课程：' + CoN);
+    detail.push('📜 规则编号：R003（同一课程同一儿童不能重复占位）');
+  } else if (RC === 'R006') {
+    shortMessage = '权限不足：顾问不能绕过业务规则';
+    detail.push('👶 儿童：' + CN);
+    detail.push('🆕 目标课程：' + CoN);
+    detail.push('📜 规则编号：R006（顾问可写备注但不能绕过年龄/容量规则）');
+  }
+
   return {
-    ruleCode: err.ruleCode,
-    ruleName: err.ruleName || RULES[err.ruleCode]?.name || '',
+    ruleCode: RC,
+    ruleName: err.ruleName || (RULES[RC] ? RULES[RC].name : '') || '',
     severity: err.severity || 'hard',
     message: err.message || '',
-    child: {
-      id: err.childId,
-      name: err.childName
-    },
-    course: {
-      id: err.courseId,
-      name: err.courseName
-    },
-    sessionId: err.sessionId,
+    shortMessage: shortMessage,
+    detail: detail,
+    suggestion: suggestion,
+    child: { id: err.childId, name: CN },
+    course: { id: err.courseId, name: CoN },
+    sessionId: SID,
     age: err.age,
-    ageRange: err.minAge !== undefined ? `${err.minAge}-${err.maxAge}` : null,
-    conflictTime: err.conflictTime,
-    conflictCourseName: err.conflictCourse,
+    ageRange: err.minAge !== undefined ? (err.minAge + '-' + err.maxAge) : null,
+    conflictTime: CT,
+    conflictCourseName: CCN,
+    conflictSession: err.conflictSession,
     raw: Object.fromEntries(
-      Object.entries(err).filter(([k]) =>
-        ['ruleCode','ruleName','severity','message','stack'].indexOf(k) < 0
-      )
+      Object.entries(err).filter(function(x) {
+        return ['ruleCode','ruleName','severity','message','stack'].indexOf(x[0]) < 0;
+      })
     ),
     ruleTrace: err.ruleTrace || []
   };
