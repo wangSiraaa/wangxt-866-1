@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  youth-center:
+    build: .
+    ports:
+      - "8660:8660"
+    container_name: youth-activity-center
+    restart: unless-stopped
